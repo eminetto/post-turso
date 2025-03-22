@@ -16,7 +16,6 @@ type Repository struct {
 	DB        *sql.DB
 	dir       string
 	connector *libsql.Connector
-	autoSync  bool
 }
 
 var ErrNotFound = errors.New("not found")
@@ -28,8 +27,7 @@ func NewRepository(dbName, url, authToken string) (*Repository, error) {
 	}
 
 	dbPath := filepath.Join(dir, dbName)
-
-	syncInterval := time.Minute
+	syncInterval := time.Second * 30
 
 	connector, err := libsql.NewEmbeddedReplicaConnector(dbPath, url,
 		libsql.WithAuthToken(authToken),
@@ -44,15 +42,14 @@ func NewRepository(dbName, url, authToken string) (*Repository, error) {
 		DB:        db,
 		dir:       dir,
 		connector: connector,
-		autoSync:  true,
 	}, nil
 }
 
-func (r *Repository) DisableAutoSync() {
-	r.autoSync = false
+func NewTestRepository() (*Repository, error) {
+	return &Repository{}, nil
 }
 
-func (r *Repository) Select(ctx context.Context, id string) (*book.Book, error) {
+func (r *Repository) Select(ctx context.Context, id int64) (*book.Book, error) {
 	rows, err := r.DB.Query("SELECT * FROM books where id = ?", id)
 	if err != nil {
 		return nil, fmt.Errorf("selecting book: %w", err)
@@ -122,21 +119,58 @@ func (r *Repository) Insert(ctx context.Context, book *book.Book) (int64, error)
 	if err != nil {
 		return 0, fmt.Errorf("getting last insert ID: %w", err)
 	}
-	if r.autoSync {
-		_, err = r.connector.Sync()
-		if err != nil {
-			return 0, fmt.Errorf("syncing connector: %w", err)
-		}
-	}
 
 	return id, nil
 }
 
 func (r *Repository) Update(ctx context.Context, book *book.Book) error {
+	stmt, err := r.DB.Prepare(`
+		update books set title=?, author=?, category=? where id=?
+	`)
+	if err != nil {
+		return fmt.Errorf("preparing statement: %w", err)
+	}
+	_, err = stmt.Exec(
+		book.Title,
+		book.Author,
+		book.Category,
+		book.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("executing statement: %w", err)
+	}
+	err = stmt.Close()
+	if err != nil {
+		return fmt.Errorf("closing statement: %w", err)
+	}
+
 	return nil
 }
 
-func (r *Repository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id int64) error {
+	sql := `DELETE FROM books WHERE id = ?`
+	_, err := r.DB.Exec(sql, id)
+	if err != nil {
+		return fmt.Errorf("deleting book: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) SetDB(db *sql.DB) {
+	r.DB = db
+}
+
+func (r *Repository) CreateTable(ctx context.Context) error {
+	sql := `CREATE TABLE books (
+  ID INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT,
+  author TEXT,
+  category int
+);`
+	_, err := r.DB.Exec(sql)
+	if err != nil {
+		return fmt.Errorf("creating table: %w", err)
+	}
 	return nil
 }
 

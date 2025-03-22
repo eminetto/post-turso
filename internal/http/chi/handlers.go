@@ -18,8 +18,8 @@ func Handlers(ctx context.Context, bookService book.UseCase) *chi.Mux {
 	r.Method(http.MethodGet, "/v1/books", getBooks(bookService))
 	r.Method(http.MethodGet, "/v1/books/{id}", getBook(bookService))
 	r.Method(http.MethodPost, "/v1/books", postBooks(bookService))
-	//r.Method(http.MethodPut, "/v1/books/{id}", putBook(bookService))
-	//r.Method(http.MethodDelete, "/v1/books/{id{", deleteBook(bookService))
+	r.Method(http.MethodPut, "/v1/books/{id}", putBook(bookService))
+	r.Method(http.MethodDelete, "/v1/books/{id}", deleteBook(bookService))
 
 	return r
 }

@@ -8,17 +8,14 @@ import (
 type UseCase interface {
 	Create(ctx context.Context, title, author string, category Category) (*Book, error)
 	List(ctx context.Context) ([]*Book, error)
-	Get(ctx context.Context, id string) (*Book, error)
-	Update(ctx context.Context, id int64, title, author string, category int64) error
-	Delete(ctx context.Context, id string) error
+	Get(ctx context.Context, id int64) (*Book, error)
+	Update(ctx context.Context, id int64, title, author string, category Category) error
+	Delete(ctx context.Context, id int64) error
 }
 
 type Service struct {
 	Repo Repository
 }
-
-// Interface guard
-var _ UseCase = (*Service)(nil)
 
 func NewService(repo Repository) *Service {
 	return &Service{
@@ -46,7 +43,7 @@ func (s *Service) List(ctx context.Context) ([]*Book, error) {
 	}
 	return all, nil
 }
-func (s *Service) Get(ctx context.Context, id string) (*Book, error) {
+func (s *Service) Get(ctx context.Context, id int64) (*Book, error) {
 	b, err := s.Repo.Select(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("selecting book: %w", err)
@@ -54,12 +51,12 @@ func (s *Service) Get(ctx context.Context, id string) (*Book, error) {
 	return b, nil
 }
 
-func (s *Service) Update(ctx context.Context, id int64, title, author string, category int64) error {
+func (s *Service) Update(ctx context.Context, id int64, title, author string, category Category) error {
 	b := Book{
 		ID:       id,
 		Title:    title,
 		Author:   author,
-		Category: Category(category),
+		Category: category,
 	}
 	err := s.Repo.Update(ctx, &b)
 	if err != nil {
@@ -67,7 +64,7 @@ func (s *Service) Update(ctx context.Context, id int64, title, author string, ca
 	}
 	return nil
 }
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (s *Service) Delete(ctx context.Context, id int64) error {
 	err := s.Repo.Delete(ctx, id)
 	if err != nil {
 		return fmt.Errorf("deleting book: %w", err)
